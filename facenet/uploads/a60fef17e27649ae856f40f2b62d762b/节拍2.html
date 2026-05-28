@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>节拍器</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #f9f9f7;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 32px 16px;
+    gap: 24px;
+    flex-wrap: wrap;
+  }
+  .card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 36px 44px 32px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.07);
+    width: 320px;
+  }
+  .card-title { font-size: 13px; color: #aaa; letter-spacing: 0.05em; font-weight: 500; align-self: flex-start; }
+
+  /* 圆环 */
+  .ring-svg { width: 140px; height: 140px; }
+  .ring-bg { fill: none; stroke: #e8e8e8; stroke-width: 3; }
+  .ring-arc { fill: none; stroke: #333; stroke-width: 3; stroke-linecap: round;
+              transform-origin: 70px 70px; transform: rotate(-90deg); }
+  .count-num { font-size: 36px; font-weight: 600; fill: #111; dominant-baseline: middle; text-anchor: middle; }
+  .count-sub { font-size: 13px; fill: #aaa; dominant-baseline: middle; text-anchor: middle; }
+
+  /* 进度 */
+  .progress-wrap { width: 100%; display: flex; flex-direction: column; gap: 4px; }
+  .bar-track { width: 100%; height: 3px; background: #e8e8e8; border-radius: 3px; overflow: hidden; }
+  .bar-fill { height: 100%; width: 0%; background: #333; border-radius: 3px; }
+  .progress-meta { display: flex; justify-content: space-between; font-size: 12px; color: #bbb; }
+
+  /* 统计栏 */
+  .stats-row { width: 100%; display: flex; gap: 0; border: 1px solid #eee; border-radius: 12px; overflow: hidden; }
+  .stat-box { flex: 1; padding: 10px 0; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .stat-box + .stat-box { border-left: 1px solid #eee; }
+  .stat-val { font-size: 18px; font-weight: 600; color: #111; }
+  .stat-key { font-size: 11px; color: #bbb; }
+
+  /* 按钮 */
+  .btn-row { display: flex; gap: 10px; }
+  button {
+    display: flex; align-items: center; gap: 6px;
+    padding: 10px 20px;
+    border: 1px solid #ddd; border-radius: 10px;
+    background: #fff; color: #222;
+    font-size: 14px; cursor: pointer;
+    transition: background 0.12s;
+  }
+  button:hover { background: #f5f5f5; }
+  button:active { transform: scale(0.98); }
+  #resetBtn { padding: 10px 14px; color: #aaa; }
+
+  /* 输入行 */
+  .row { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+  .row-labels { display: flex; justify-content: space-between; font-size: 12px; color: #aaa; }
+  input[type=range] { width: 100%; accent-color: #555; cursor: pointer; }
+  input[type=number], input[type=text] {
+    flex: 1; padding: 8px 12px;
+    border: 1px solid #ddd; border-radius: 8px;
+    font-size: 14px; color: #222; background: #fff; outline: none;
+  }
+  input[type=number]:focus, input[type=text]:focus { border-color: #aaa; }
+  .apply-btn { padding: 8px 14px !important; }
+
+  /* 历史记录卡 */
+  .history-card {
+    background: #fff;
+    border-radius: 20px;
+    padding: 28px 32px;
+    box-shadow: 0 2px 24px rgba(0,0,0,0.07);
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  .history-header { display: flex; justify-content: space-between; align-items: center; }
+  .history-title { font-size: 13px; color: #aaa; letter-spacing: 0.05em; font-weight: 500; }
+  .clear-btn { font-size: 12px; color: #ccc; background: none; border: none; cursor: pointer; padding: 2px 6px; }
+  .clear-btn:hover { color: #888; background: none; }
+
+  /* 累计统计 */
+  .total-box { background: #f9f9f7; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 13px; }
+  .total-label { color: #aaa; }
+  .total-val { color: #111; font-weight: 500; }
+
+  /* 历史列表 */
+  .history-list { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow-y: auto; }
+  .history-list::-webkit-scrollbar { width: 4px; }
+  .history-list::-webkit-scrollbar-track { background: #f0f0f0; border-radius: 2px; }
+  .history-list::-webkit-scrollbar-thumb { background: #ddd; border-radius: 2px; }
+  .history-item {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 14px;
+    background: #f9f9f7; border-radius: 10px;
+    font-size: 13px;
+  }
+  .hi-left { display: flex; flex-direction: column; gap: 3px; }
+  .hi-name { color: #222; font-weight: 500; }
+  .hi-meta { color: #bbb; font-size: 11px; }
+  .hi-right { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+  .hi-count { color: #111; font-weight: 600; font-size: 16px; }
+  .hi-time { color: #bbb; font-size: 11px; }
+  .empty-hint { font-size: 13px; color: #ccc; text-align: center; padding: 24px 0; }
+
+  .interval-text { font-size: 12px; color: #ccc; text-align: center; }
+</style>
+</head>
+<body>
+
+<!-- 左：节拍器 -->
+<div class="card">
+  <div class="card-title">节拍器</div>
+
+  <svg class="ring-svg" viewBox="0 0 140 140">
+    <circle class="ring-bg" cx="70" cy="70" r="58"/>
+    <circle class="ring-arc" id="arc" cx="70" cy="70" r="58"
+            stroke-dasharray="364.4" stroke-dashoffset="364.4"/>
+    <text class="count-num" id="countNum" x="70" y="66">0</text>
+    <text class="count-sub" x="70" y="90">次数</text>
+  </svg>
+
+  <div class="progress-wrap">
+    <div class="bar-track"><div class="bar-fill" id="barFill"></div></div>
+    <div class="progress-meta">
+      <span id="elapsedText">0.0s</span>
+      <span class="interval-text" id="intervalLabel">间隔 3.15s</span>
+    </div>
+  </div>
+
+  <!-- 统计 -->
+  <div class="stats-row">
+    <div class="stat-box">
+      <span class="stat-val" id="statTotal">0</span>
+      <span class="stat-key">累计次数</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-val" id="statTime">0s</span>
+      <span class="stat-key">本次时长</span>
+    </div>
+    <div class="stat-box">
+      <span class="stat-val" id="statSessions">0</span>
+      <span class="stat-key">历史场次</span>
+    </div>
+  </div>
+
+  <div class="btn-row">
+    <button id="playBtn" onclick="toggle()">▶ 开始</button>
+    <button id="resetBtn" onclick="resetSession()">↺</button>
+    <button onclick="saveSession()" style="padding:10px 14px;color:#888;" title="保存本次记录">💾</button>
+  </div>
+
+  <!-- 标签 -->
+  <div class="row">
+    <div class="row-labels"><span>本次标签（可选）</span></div>
+    <input type="text" id="sessionLabel" placeholder="例：练习、工作、冥想…" maxlength="20">
+  </div>
+
+  <!-- 间隔 -->
+  <div class="row">
+    <div class="row-labels"><span>间隔（秒）</span><span id="bpmHint">≈ 19.0 BPM</span></div>
+    <div style="display:flex;gap:8px;">
+      <input type="number" id="intervalInput" value="3.15" min="0.1" max="60" step="0.05">
+      <button class="apply-btn" onclick="applyInterval()">应用</button>
+    </div>
+  </div>
+
+  <!-- 音量 -->
+  <div class="row">
+    <div class="row-labels"><span>音量</span><span id="volLabel">80%</span></div>
+    <input type="range" min="0" max="100" value="80" step="1"
+           oninput="volume=this.value/100; document.getElementById('volLabel').textContent=this.value+'%'">
+  </div>
+</div>
+
+<!-- 右：历史 -->
+<div class="history-card">
+  <div class="history-header">
+    <span class="history-title">历史记录</span>
+    <button class="clear-btn" onclick="clearHistory()">清空</button>
+  </div>
+
+  <!-- 累计 -->
+  <div class="total-box">
+    <div class="total-row"><span class="total-label">累计总次数</span><span class="total-val" id="totalCount">0 次</span></div>
+    <div class="total-row"><span class="total-label">累计总时长</span><span class="total-val" id="totalDuration">0 秒</span></div>
+    <div class="total-row"><span class="total-label">历史场次</span><span class="total-val" id="totalSessions">0 场</span></div>
+  </div>
+
+  <div class="history-list" id="historyList">
+    <div class="empty-hint" id="emptyHint">暂无记录<br>完成一次后点 💾 保存</div>
+  </div>
+</div>
+
+<script>
+let INTERVAL = 3150;
+const CIRCUMFERENCE = 364.4;
+let running = false;
+let count = 0;
+let volume = 0.8;
+let rafId = null;
+let startTime = null;
+let lastBeat = -1;
+let sessionStartTs = null;
+let sessionElapsedMs = 0;
+let history = JSON.parse(localStorage.getItem('metronome_history') || '[]');
+
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+function beep() {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  osc.type = 'sine'; osc.frequency.value = 880;
+  gain.gain.setValueAtTime(volume * 0.6, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+  osc.start(); osc.stop(audioCtx.currentTime + 0.12);
+  const arc = document.getElementById('arc');
+  arc.style.stroke = '#111';
+  setTimeout(() => arc.style.stroke = '#333', 200);
+}
+
+function tick(ts) {
+  if (!running) return;
+  if (startTime === null) startTime = ts;
+  const elapsed = ts - startTime;
+  const beatIndex = Math.floor(elapsed / INTERVAL);
+  const cycle = elapsed % INTERVAL;
+  const pct = cycle / INTERVAL;
+
+  document.getElementById('arc').style.strokeDashoffset = CIRCUMFERENCE * (1 - pct);
+  document.getElementById('barFill').style.width = (pct * 100).toFixed(1) + '%';
+  document.getElementById('elapsedText').textContent = (cycle / 1000).toFixed(1) + 's';
+
+  // 本次时长
+  const sessionMs = sessionElapsedMs + (Date.now() - sessionStartTs);
+  document.getElementById('statTime').textContent = fmtDur(sessionMs);
+
+  if (beatIndex !== lastBeat) {
+    lastBeat = beatIndex;
+    count++;
+    document.getElementById('countNum').textContent = count;
+    document.getElementById('statTotal').textContent = count;
+    beep();
+  }
+  rafId = requestAnimationFrame(tick);
+}
+
+function toggle() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  running = !running;
+  const btn = document.getElementById('playBtn');
+  if (running) {
+    btn.textContent = '⏸ 暂停';
+    startTime = null;
+    lastBeat = count - 1;
+    sessionStartTs = Date.now();
+    rafId = requestAnimationFrame(tick);
+  } else {
+    btn.textContent = '▶ 继续';
+    cancelAnimationFrame(rafId);
+    sessionElapsedMs += Date.now() - sessionStartTs;
+    startTime = null;
+  }
+}
+
+function resetSession() {
+  running = false;
+  cancelAnimationFrame(rafId);
+  count = 0; startTime = null; lastBeat = -1;
+  sessionElapsedMs = 0; sessionStartTs = null;
+  document.getElementById('playBtn').textContent = '▶ 开始';
+  document.getElementById('countNum').textContent = '0';
+  document.getElementById('arc').style.strokeDashoffset = CIRCUMFERENCE;
+  document.getElementById('barFill').style.width = '0%';
+  document.getElementById('elapsedText').textContent = '0.0s';
+  document.getElementById('statTotal').textContent = '0';
+  document.getElementById('statTime').textContent = '0s';
+}
+
+function saveSession() {
+  if (count === 0) return;
+  if (running) {
+    sessionElapsedMs += Date.now() - sessionStartTs;
+    sessionStartTs = Date.now();
+  }
+  const label = document.getElementById('sessionLabel').value.trim() || '未命名';
+  const rec = {
+    id: Date.now(),
+    label,
+    count,
+    durationMs: sessionElapsedMs,
+    interval: INTERVAL / 1000,
+    ts: new Date().toLocaleString('zh-CN', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'})
+  };
+  history.unshift(rec);
+  localStorage.setItem('metronome_history', JSON.stringify(history));
+  document.getElementById('sessionLabel').value = '';
+  renderHistory();
+  resetSession();
+}
+
+function clearHistory() {
+  if (!confirm('确定清空所有历史记录？')) return;
+  history = [];
+  localStorage.removeItem('metronome_history');
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const empty = document.getElementById('emptyHint');
+  document.getElementById('statSessions').textContent = history.length;
+
+  const totalCount = history.reduce((s, r) => s + r.count, 0);
+  const totalMs = history.reduce((s, r) => s + r.durationMs, 0);
+  document.getElementById('totalCount').textContent = totalCount + ' 次';
+  document.getElementById('totalDuration').textContent = fmtDur(totalMs);
+  document.getElementById('totalSessions').textContent = history.length + ' 场';
+
+  if (history.length === 0) {
+    empty.style.display = 'block';
+    list.querySelectorAll('.history-item').forEach(el => el.remove());
+    return;
+  }
+  empty.style.display = 'none';
+  list.querySelectorAll('.history-item').forEach(el => el.remove());
+
+  history.forEach(rec => {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = `
+      <div class="hi-left">
+        <span class="hi-name">${rec.label}</span>
+        <span class="hi-meta">间隔 ${rec.interval}s · ${rec.ts}</span>
+      </div>
+      <div class="hi-right">
+        <span class="hi-count">${rec.count} 次</span>
+        <span class="hi-time">${fmtDur(rec.durationMs)}</span>
+      </div>`;
+    list.appendChild(el);
+  });
+}
+
+function fmtDur(ms) {
+  const s = Math.round(ms / 1000);
+  if (s < 60) return s + 's';
+  const m = Math.floor(s / 60), rs = s % 60;
+  return m + 'm' + (rs ? rs + 's' : '');
+}
+
+function applyInterval() {
+  const val = parseFloat(document.getElementById('intervalInput').value);
+  if (isNaN(val) || val < 0.1 || val > 60) return;
+  INTERVAL = Math.round(val * 1000);
+  document.getElementById('intervalLabel').textContent = '间隔 ' + val.toFixed(2) + 's';
+  document.getElementById('bpmHint').textContent = '≈ ' + (60 / val).toFixed(1) + ' BPM';
+  startTime = null; lastBeat = count - 1;
+}
+
+document.getElementById('intervalInput').addEventListener('input', function() {
+  const val = parseFloat(this.value);
+  if (!isNaN(val) && val > 0)
+    document.getElementById('bpmHint').textContent = '≈ ' + (60 / val).toFixed(1) + ' BPM';
+});
+document.getElementById('intervalInput').addEventListener('keydown', e => { if (e.key === 'Enter') applyInterval(); });
+
+renderHistory();
+</script>
+</body>
+</html>
